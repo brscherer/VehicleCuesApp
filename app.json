@@ -33,6 +33,9 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      [ "expo-sensors",
+        { "motionPermission": "Allow VehicleCuesApp to access device motion" }
       ]
     ],
     "experiments": {
