@@ -1,75 +1,107 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// index.tsx
+import { DeviceMotion } from 'expo-sensors';
+import React, { useEffect, useState } from 'react';
+import { Button, Dimensions, StyleSheet, View } from 'react-native';
+import Animated, {
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+const { width, height } = Dimensions.get('window');
+const DOT_SIZE = 20;
+const OFFSET_MULTIPLIER = 25;
 
-export default function HomeScreen() {
+export default function App() {
+  const [enabled, setEnabled] = useState(false);
+  const accel = useSharedValue({ x: 0, y: 0, z: 0 });
+
+  useEffect(() => {
+    DeviceMotion.setUpdateInterval(100); // 10 Hz :contentReference[oaicite:1]{index=1}
+    let sub: any;
+    if (enabled) {
+      sub = DeviceMotion.addListener((dm) => {
+        accel.value = dm.acceleration || { x: 0, y: 0, z: 0 };
+      });
+    }
+    return () => sub?.remove();
+  }, [enabled]);
+
+  const speed = useDerivedValue(() => {
+    const { x, y, z } = accel.value;
+    return Math.sqrt(x * x + y * y + z * z);
+  });
+
+  const inVehicle = useDerivedValue(() => speed.value > 0.5);
+
+  // Shared values for dot offsets
+  const offsetX = useSharedValue(0);
+  const offsetY = useSharedValue(0);
+
+  useAnimatedReaction(
+    () => accel.value.x,
+    (x) => {
+      if (inVehicle.value) {
+        offsetX.value = withSpring(-x * OFFSET_MULTIPLIER);
+      } else {
+        offsetX.value = withSpring(0);
+      }
+    }
+  );
+
+  useAnimatedReaction(
+    () => accel.value.y,
+    (y) => {
+      if (inVehicle.value) {
+        offsetY.value = withSpring(y * OFFSET_MULTIPLIER);
+      } else {
+        offsetY.value = withSpring(0);
+      }
+    }
+  );
+
+  const leftDotStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: offsetX.value }],
+    opacity: inVehicle.value ? 1 : 0,
+  }));
+  const topDotStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: offsetY.value }],
+    opacity: inVehicle.value ? 1 : 0,
+  }));
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <View style={styles.container}>
+      <Button
+        title={enabled ? 'Disable Cues' : 'Enable Cues'}
+        onPress={() => setEnabled((v) => !v)}
+      />
+      <View style={styles.dotsContainer}>
+        <Animated.View style={[styles.dot, styles.left, leftDotStyle]} />
+        <Animated.View style={[styles.dot, styles.top, topDotStyle]} />
+        {/* You can add right/bottom dots similarly for turning/braking */}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  container: { flex: 1, justifyContent: 'center' },
+  dotsContainer: { ...StyleSheet.absoluteFillObject },
+  dot: {
     position: 'absolute',
+    width: DOT_SIZE,
+    height: DOT_SIZE,
+    borderRadius: DOT_SIZE / 2,
+    backgroundColor: 'red',
+  },
+  left: {
+    left: 10,
+    top: height / 2 - DOT_SIZE / 2,
+  },
+  top: {
+    top: 10,
+    left: width / 2 - DOT_SIZE / 2,
   },
 });
