@@ -1,4 +1,3 @@
-// index.tsx
 import { DeviceMotion } from 'expo-sensors';
 import React, { useEffect, useState } from 'react';
 import { Button, Dimensions, StyleSheet, View } from 'react-native';
@@ -12,14 +11,14 @@ import Animated, {
 
 const { width, height } = Dimensions.get('window');
 const DOT_SIZE = 20;
-const OFFSET_MULTIPLIER = 25;
+const OFFSET_MULTIPLIER = 25; // make dot movement noticeable, increasing affect sensitivity
 
 export default function App() {
   const [enabled, setEnabled] = useState(false);
-  const accel = useSharedValue({ x: 0, y: 0, z: 0 });
+  const accel = useSharedValue({ x: 0, y: 0, z: 0 }); // x: left-to-right; y: bottom-to-top; z: into/out of screen
 
   useEffect(() => {
-    DeviceMotion.setUpdateInterval(100); // 10 Hz :contentReference[oaicite:1]{index=1}
+    DeviceMotion.setUpdateInterval(100); // motion and orientation sensors each 100ms
     let sub: any;
     if (enabled) {
       sub = DeviceMotion.addListener((dm) => {
@@ -27,19 +26,20 @@ export default function App() {
       });
     }
     return () => sub?.remove();
-  }, [enabled]);
+  }, [accel, enabled]);
 
   const speed = useDerivedValue(() => {
     const { x, y, z } = accel.value;
     return Math.sqrt(x * x + y * y + z * z);
   });
 
-  const inVehicle = useDerivedValue(() => speed.value > 0.5);
+  const inVehicle = useDerivedValue(() => speed.value > 0.5); // threshold for hand movement, triggering only on vehicle movement (higher speed)
 
   // Shared values for dot offsets
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
 
+  // runs animations only on changes
   useAnimatedReaction(
     () => accel.value.x,
     (x) => {
@@ -51,6 +51,7 @@ export default function App() {
     }
   );
 
+  // separate animations from x axis to y axis
   useAnimatedReaction(
     () => accel.value.y,
     (y) => {
@@ -80,7 +81,6 @@ export default function App() {
       <View style={styles.dotsContainer}>
         <Animated.View style={[styles.dot, styles.left, leftDotStyle]} />
         <Animated.View style={[styles.dot, styles.top, topDotStyle]} />
-        {/* You can add right/bottom dots similarly for turning/braking */}
       </View>
     </View>
   );
